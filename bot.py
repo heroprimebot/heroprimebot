@@ -28,6 +28,7 @@ IMAGE_FILE = "site_image.json"
 
 
 # ============================================================
+# ============================================================
 # MENÜ
 # ============================================================
 
@@ -100,6 +101,7 @@ BAD_WORDS = {
 
 
 def normalize_text(text):
+
     text = text.lower()
 
     replacements = {
@@ -114,39 +116,26 @@ def normalize_text(text):
     for old, new in replacements.items():
         text = text.replace(old, new)
 
-    # Nokta, boşluk, tire vb. karakterleri kaldır.
-    text = re.sub(r"[^a-z0-9]", "", text)
+    # Boşluk, nokta, tire vb. karakterleri kaldırır.
+    text = re.sub(
+        r"[^a-z0-9]",
+        "",
+        text
+    )
 
     return text
 
 
 def contains_bad_word(text):
+
     normalized = normalize_text(text)
 
     for word in BAD_WORDS:
+
         if normalize_text(word) in normalized:
             return True
 
     return False
-
-
-# ============================================================
-# BUTONLAR
-# ============================================================
-
-def site_keyboard():
-
-    keyboard = []
-
-    for name, url in SITES:
-        keyboard.append([
-            InlineKeyboardButton(
-                name,
-                url=url
-            )
-        ])
-
-    return InlineKeyboardMarkup(keyboard)
 
 
 # ============================================================
@@ -162,7 +151,9 @@ def save_image(file_id):
     ) as file:
 
         json.dump(
-            {"file_id": file_id},
+            {
+                "file_id": file_id
+            },
             file,
             ensure_ascii=False,
             indent=2
@@ -206,15 +197,20 @@ async def send_site_menu(
 
     text = (
         "🌐 <b>HEROPRIME</b>\n\n"
-        "📌 Güvenilir Sponsor ve VIP Sitelerimize aşağıdaki butonlardan ulaşabilirsiniz.
-
-⚠️ Dikkat!
-Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza giriş bilgisi istemez."
+        "📌 Güvenilir Sponsor ve VIP Sitelerimize "
+        "aşağıdaki butonlardan ulaşabilirsiniz.\n\n"
+        "⚠️ <b>Dikkat!</b>\n"
+        "Hiçbir yönetici sizden özel mesaj yoluyla "
+        "para talep etmez veya hesabınıza giriş bilgisi istemez."
     )
 
     keyboard = site_keyboard()
 
     image_id = load_image()
+
+    # --------------------------------------------------------
+    # GÖRSEL VARSA
+    # --------------------------------------------------------
 
     if image_id:
 
@@ -232,6 +228,10 @@ Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza 
         except Exception:
 
             pass
+
+    # --------------------------------------------------------
+    # GÖRSEL YOKSA SADECE YAZI
+    # --------------------------------------------------------
 
     await update.message.reply_text(
         text,
@@ -272,7 +272,10 @@ async def text_commands(
 
     text = update.message.text.strip().lower()
 
-    if text in (".site", "!site"):
+    if text in (
+        ".site",
+        "!site"
+    ):
 
         await send_site_menu(
             update,
@@ -289,7 +292,10 @@ async def setimage_command(
     context: ContextTypes.DEFAULT_TYPE
 ):
 
-    # Sadece grup yöneticileri görsel değiştirebilir.
+    # --------------------------------------------------------
+    # Grup yöneticisi kontrolü
+    # --------------------------------------------------------
+
     if update.effective_chat.type in (
         "group",
         "supergroup"
@@ -309,6 +315,10 @@ async def setimage_command(
             )
 
             return
+
+    # --------------------------------------------------------
+    # Görsel bekleme modu
+    # --------------------------------------------------------
 
     context.user_data[
         "waiting_for_site_image"
@@ -340,6 +350,7 @@ async def receive_image(
     if not update.message.photo:
         return
 
+    # En yüksek çözünürlüklü fotoğrafı al.
     photo = update.message.photo[-1]
 
     save_image(
@@ -395,6 +406,7 @@ async def moderation_handler(
     if not update.message:
         return
 
+    # Sadece gruplarda çalış.
     if update.effective_chat.type not in (
         "group",
         "supergroup"
@@ -418,12 +430,16 @@ async def moderation_handler(
     if not message_text:
         return
 
+    # Küfür/hakaret yoksa hiçbir şey yapma.
     if not contains_bad_word(message_text):
         return
 
     user_id = update.effective_user.id
 
-    # Grup yöneticilerine dokunma.
+    # --------------------------------------------------------
+    # YÖNETİCİLERE DOKUNMA
+    # --------------------------------------------------------
+
     try:
 
         member = await update.effective_chat.get_member(
@@ -441,7 +457,10 @@ async def moderation_handler(
 
         return
 
-    # Uygunsuz mesajı sil.
+    # --------------------------------------------------------
+    # MESAJI SİL
+    # --------------------------------------------------------
+
     try:
 
         await update.message.delete()
@@ -450,14 +469,17 @@ async def moderation_handler(
 
         return
 
-    # Kullanıcıya kısa uyarı gönder.
+    # --------------------------------------------------------
+    # UYARI GÖNDER
+    # --------------------------------------------------------
+
     try:
 
         warning = await update.effective_chat.send_message(
             "⚠️ Uygunsuz/küfürlü mesaj silindi."
         )
 
-        # Uyarıyı 10 saniye sonra sil.
+        # 10 saniye sonra uyarıyı sil.
         context.job_queue.run_once(
             delete_warning,
             10,
@@ -512,15 +534,20 @@ async def button_callback(
 
     text = (
         "🌐 <b>HEROPRIME</b>\n\n"
-        "📌 Güvenilir Sponsor ve VIP Sitelerimize aşağıdaki butonlardan ulaşabilirsiniz.
-
-⚠️ Dikkat!
-Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza giriş bilgisi istemez."
+        "📌 Güvenilir Sponsor ve VIP Sitelerimize "
+        "aşağıdaki butonlardan ulaşabilirsiniz.\n\n"
+        "⚠️ <b>Dikkat!</b>\n"
+        "Hiçbir yönetici sizden özel mesaj yoluyla "
+        "para talep etmez veya hesabınıza giriş bilgisi istemez."
     )
 
     keyboard = site_keyboard()
 
     image_id = load_image()
+
+    # --------------------------------------------------------
+    # GÖRSEL VARSA
+    # --------------------------------------------------------
 
     if image_id:
 
@@ -539,6 +566,10 @@ Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza 
 
             pass
 
+    # --------------------------------------------------------
+    # GÖRSEL YOKSA
+    # --------------------------------------------------------
+
     await query.message.reply_text(
         text,
         parse_mode="HTML",
@@ -552,12 +583,20 @@ Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza 
 
 def main():
 
+    # --------------------------------------------------------
+    # TOKEN KONTROLÜ
+    # --------------------------------------------------------
+
     if not BOT_TOKEN:
 
         raise RuntimeError(
             "BOT_TOKEN bulunamadı. "
             "Railway Variables kısmına BOT_TOKEN ekle."
         )
+
+    # --------------------------------------------------------
+    # APPLICATION
+    # --------------------------------------------------------
 
     application = (
         Application
@@ -566,7 +605,10 @@ def main():
         .build()
     )
 
+    # --------------------------------------------------------
     # /site
+    # --------------------------------------------------------
+
     application.add_handler(
         CommandHandler(
             "site",
@@ -574,7 +616,10 @@ def main():
         )
     )
 
+    # --------------------------------------------------------
     # /setimage
+    # --------------------------------------------------------
+
     application.add_handler(
         CommandHandler(
             "setimage",
@@ -582,7 +627,10 @@ def main():
         )
     )
 
+    # --------------------------------------------------------
     # /siteimage
+    # --------------------------------------------------------
+
     application.add_handler(
         CommandHandler(
             "siteimage",
@@ -590,14 +638,20 @@ def main():
         )
     )
 
-    # Inline butonlar
+    # --------------------------------------------------------
+    # INLINE BUTONLAR
+    # --------------------------------------------------------
+
     application.add_handler(
         CallbackQueryHandler(
             button_callback
         )
     )
 
-    # Fotoğraf
+    # --------------------------------------------------------
+    # FOTOĞRAF
+    # --------------------------------------------------------
+
     application.add_handler(
         MessageHandler(
             filters.PHOTO,
@@ -605,7 +659,10 @@ def main():
         )
     )
 
+    # --------------------------------------------------------
     # .site / !site
+    # --------------------------------------------------------
+
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -613,7 +670,10 @@ def main():
         )
     )
 
-    # Moderasyon
+    # --------------------------------------------------------
+    # MODERASYON
+    # --------------------------------------------------------
+
     application.add_handler(
         MessageHandler(
             filters.TEXT | filters.Caption(),
@@ -621,6 +681,10 @@ def main():
         ),
         group=1
     )
+
+    # --------------------------------------------------------
+    # BAŞLAT
+    # --------------------------------------------------------
 
     print(
         "🤖 HEROPRIME moderasyon botu çalışıyor..."
