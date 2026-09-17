@@ -209,9 +209,6 @@ async def send_site_menu(
         "📌 Güvenilir Sponsor ve VIP Sitelerimize aşağıdaki butonlardan ulaşabilirsiniz.
 
 ⚠️ Dikkat!
-Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza giriş bilgisi istemez.
-
-⚠️ Dikkat!
 Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza giriş bilgisi istemez."
     )
 
@@ -515,7 +512,10 @@ async def button_callback(
 
     text = (
         "🌐 <b>HEROPRIME</b>\n\n"
-        "Aşağıdaki butonlardan seçim yapabilirsin."
+        "📌 Güvenilir Sponsor ve VIP Sitelerimize aşağıdaki butonlardan ulaşabilirsiniz.
+
+⚠️ Dikkat!
+Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza giriş bilgisi istemez."
     )
 
     keyboard = site_keyboard()
