@@ -21,7 +21,7 @@ from telegram.ext import (
 # AYARLAR
 # ============================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = "8862557397:AAEln-hhR7QlInKo0qQap96r44533Uu7qXA"
 
 # Site görselinin Telegram file_id bilgisini burada saklıyoruz.
 IMAGE_FILE = "site_image.json"
