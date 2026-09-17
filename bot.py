@@ -1,5 +1,6 @@
 import os
 import json
+import re
 
 from telegram import (
     Update,
@@ -21,16 +22,16 @@ from telegram.ext import (
 # AYARLAR
 # ============================================================
 
-BOT_TOKEN = "8862557397:AAE7SvuqE5ST4RiIcQz9g5G66o8uNzBV9Uw"
+BOT_TOKEN = os.getenv("BOT_TOKEN")
 
-# Site görselinin Telegram file_id bilgisini burada saklıyoruz.
 IMAGE_FILE = "site_image.json"
 
 
 # ============================================================
-# SİTELER
+# MENÜ
 # ============================================================
 
+# Buraya kullanacağın güvenli/genel bağlantıları ekleyebilirsin.
 SITES = [
     (
         "🎰 JASİNO",
@@ -88,14 +89,71 @@ def site_keyboard():
 
 
 # ============================================================
-# GÖRSELİ KAYDET
+# KÜFÜR / HAKARET FİLTRESİ
+# ============================================================
+
+BAD_WORDS = {
+    "ornek1",
+    "ornek2",
+    "ornek3",
+}
+
+
+def normalize_text(text):
+    text = text.lower()
+
+    replacements = {
+        "ı": "i",
+        "ş": "s",
+        "ğ": "g",
+        "ü": "u",
+        "ö": "o",
+        "ç": "c",
+    }
+
+    for old, new in replacements.items():
+        text = text.replace(old, new)
+
+    # Nokta, boşluk, tire vb. karakterleri kaldır.
+    text = re.sub(r"[^a-z0-9]", "", text)
+
+    return text
+
+
+def contains_bad_word(text):
+    normalized = normalize_text(text)
+
+    for word in BAD_WORDS:
+        if normalize_text(word) in normalized:
+            return True
+
+    return False
+
+
+# ============================================================
+# BUTONLAR
+# ============================================================
+
+def site_keyboard():
+
+    keyboard = []
+
+    for name, url in SITES:
+        keyboard.append([
+            InlineKeyboardButton(
+                name,
+                url=url
+            )
+        ])
+
+    return InlineKeyboardMarkup(keyboard)
+
+
+# ============================================================
+# GÖRSEL KAYDET
 # ============================================================
 
 def save_image(file_id):
-
-    data = {
-        "file_id": file_id
-    }
 
     with open(
         IMAGE_FILE,
@@ -104,7 +162,7 @@ def save_image(file_id):
     ) as file:
 
         json.dump(
-            data,
+            {"file_id": file_id},
             file,
             ensure_ascii=False,
             indent=2
@@ -112,7 +170,7 @@ def save_image(file_id):
 
 
 # ============================================================
-# KAYITLI GÖRSELİ OKU
+# GÖRSEL OKU
 # ============================================================
 
 def load_image():
@@ -138,7 +196,7 @@ def load_image():
 
 
 # ============================================================
-# SİTE MENÜSÜNÜ GÖNDER
+# SİTE MENÜSÜ
 # ============================================================
 
 async def send_site_menu(
@@ -147,17 +205,13 @@ async def send_site_menu(
 ):
 
     text = (
-        "🎰 <b>HEROPRIME</b>\n\n"
+        "🌐 <b>HEROPRIME</b>\n\n"
         "Aşağıdaki butonlardan seçim yapabilirsin."
     )
 
     keyboard = site_keyboard()
 
     image_id = load_image()
-
-    # --------------------------------------------------------
-    # GÖRSELLİ MENÜ
-    # --------------------------------------------------------
 
     if image_id:
 
@@ -176,44 +230,10 @@ async def send_site_menu(
 
             pass
 
-    # --------------------------------------------------------
-    # GÖRSEL YOKSA SADECE BUTONLAR
-    # --------------------------------------------------------
-
     await update.message.reply_text(
         text,
         parse_mode="HTML",
         reply_markup=keyboard
-    )
-
-
-# ============================================================
-# /start
-# ============================================================
-
-async def start_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    keyboard = [
-        [
-            InlineKeyboardButton(
-                "🎰 SİTELER",
-                callback_data="sites"
-            )
-        ]
-    ]
-
-    await update.message.reply_text(
-        "👋 <b>Hoş geldin!</b>\n\n"
-        "Menüden işlem seçebilirsin.\n\n"
-        "Site menüsünü açmak için:\n"
-        "<code>.site</code>\n"
-        "veya\n"
-        "<code>!site</code>",
-        parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup(keyboard)
     )
 
 
@@ -229,66 +249,6 @@ async def site_command(
     await send_site_menu(
         update,
         context
-    )
-
-
-# ============================================================
-# /setimage
-# ============================================================
-
-async def setimage_command(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    context.user_data[
-        "waiting_for_site_image"
-    ] = True
-
-    await update.message.reply_text(
-        "🖼️ <b>Site görselini gönder.</b>\n\n"
-        "Fotoğraf olarak gönderdiğinde "
-        "otomatik olarak kaydedilecek.",
-        parse_mode="HTML"
-    )
-
-
-# ============================================================
-# GÖRSELİ AL
-# ============================================================
-
-async def receive_image(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-    if not context.user_data.get(
-        "waiting_for_site_image"
-    ):
-
-        return
-
-    if not update.message.photo:
-
-        return
-
-    # Telegram'ın gönderdiği en büyük fotoğraf
-    photo = update.message.photo[-1]
-
-    file_id = photo.file_id
-
-    save_image(file_id)
-
-    context.user_data[
-        "waiting_for_site_image"
-    ] = False
-
-    await update.message.reply_text(
-        "✅ <b>Görsel kaydedildi.</b>\n\n"
-        "Artık <code>.site</code> veya "
-        "<code>!site</code> yazıldığında "
-        "bu görsel kullanılacak.",
-        parse_mode="HTML"
     )
 
 
@@ -309,31 +269,89 @@ async def text_commands(
 
     text = update.message.text.strip().lower()
 
-    # --------------------------------------------------------
-    # .site
-    # --------------------------------------------------------
-
-    if text == ".site":
+    if text in (".site", "!site"):
 
         await send_site_menu(
             update,
             context
         )
 
-        return
 
-    # --------------------------------------------------------
-    # !site
-    # --------------------------------------------------------
+# ============================================================
+# /setimage
+# ============================================================
 
-    if text == "!site":
+async def setimage_command(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
 
-        await send_site_menu(
-            update,
-            context
+    # Sadece grup yöneticileri görsel değiştirebilir.
+    if update.effective_chat.type in (
+        "group",
+        "supergroup"
+    ):
+
+        member = await update.effective_chat.get_member(
+            update.effective_user.id
         )
 
+        if member.status not in (
+            "administrator",
+            "creator"
+        ):
+
+            await update.message.reply_text(
+                "❌ Bu işlemi sadece grup yöneticileri kullanabilir."
+            )
+
+            return
+
+    context.user_data[
+        "waiting_for_site_image"
+    ] = True
+
+    await update.message.reply_text(
+        "🖼️ Site görselini fotoğraf olarak gönder."
+    )
+
+
+# ============================================================
+# GÖRSEL AL
+# ============================================================
+
+async def receive_image(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not context.user_data.get(
+        "waiting_for_site_image"
+    ):
+
         return
+
+    if not update.message:
+        return
+
+    if not update.message.photo:
+        return
+
+    photo = update.message.photo[-1]
+
+    save_image(
+        photo.file_id
+    )
+
+    context.user_data[
+        "waiting_for_site_image"
+    ] = False
+
+    await update.message.reply_text(
+        "✅ Görsel kaydedildi.\n\n"
+        "Artık .site veya !site yazıldığında "
+        "bu görsel kullanılacak."
+    )
 
 
 # ============================================================
@@ -350,20 +368,131 @@ async def siteimage_command(
     if not image_id:
 
         await update.message.reply_text(
-            "❌ Henüz site görseli ayarlanmadı.\n\n"
-            "Önce /setimage komutunu kullan."
+            "❌ Henüz görsel ayarlanmadı.\n\n"
+            "Önce /setimage kullan."
         )
 
         return
 
     await update.message.reply_photo(
         photo=image_id,
-        caption="🖼️ Mevcut site görseli"
+        caption="🖼️ Mevcut görsel"
     )
 
 
 # ============================================================
-# BUTONLAR
+# KÜFÜR / HAKARET MODERASYONU
+# ============================================================
+
+async def moderation_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    if not update.message:
+        return
+
+    if update.effective_chat.type not in (
+        "group",
+        "supergroup"
+    ):
+
+        return
+
+    if not update.effective_user:
+        return
+
+    # Botların mesajlarını kontrol etme.
+    if update.effective_user.is_bot:
+        return
+
+    message_text = (
+        update.message.text
+        or update.message.caption
+        or ""
+    )
+
+    if not message_text:
+        return
+
+    if not contains_bad_word(message_text):
+        return
+
+    user_id = update.effective_user.id
+
+    # Grup yöneticilerine dokunma.
+    try:
+
+        member = await update.effective_chat.get_member(
+            user_id
+        )
+
+        if member.status in (
+            "administrator",
+            "creator"
+        ):
+
+            return
+
+    except Exception:
+
+        return
+
+    # Uygunsuz mesajı sil.
+    try:
+
+        await update.message.delete()
+
+    except Exception:
+
+        return
+
+    # Kullanıcıya kısa uyarı gönder.
+    try:
+
+        warning = await update.effective_chat.send_message(
+            "⚠️ Uygunsuz/küfürlü mesaj silindi."
+        )
+
+        # Uyarıyı 10 saniye sonra sil.
+        context.job_queue.run_once(
+            delete_warning,
+            10,
+            data={
+                "chat_id": update.effective_chat.id,
+                "message_id": warning.message_id,
+            }
+        )
+
+    except Exception:
+
+        pass
+
+
+# ============================================================
+# UYARIYI SİL
+# ============================================================
+
+async def delete_warning(
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    data = context.job.data
+
+    try:
+
+        await context.bot.delete_message(
+            chat_id=data["chat_id"],
+            message_id=data["message_id"]
+        )
+
+    except Exception:
+
+        pass
+
+
+# ============================================================
+# BUTON CALLBACK
 # ============================================================
 
 async def button_callback(
@@ -375,55 +504,44 @@ async def button_callback(
 
     await query.answer()
 
-    # --------------------------------------------------------
-    # SİTELER BUTONU
-    # --------------------------------------------------------
+    if query.data != "sites":
+        return
 
-    if query.data == "sites":
+    text = (
+        "🌐 <b>HEROPRIME</b>\n\n"
+        "Aşağıdaki butonlardan seçim yapabilirsin."
+    )
 
-        text = (
-            "🎰 <b>HEROPRIME</b>\n\n"
-            "Aşağıdaki butonlardan seçim yapabilirsin."
-        )
+    keyboard = site_keyboard()
 
-        keyboard = site_keyboard()
+    image_id = load_image()
 
-        image_id = load_image()
+    if image_id:
 
-        # ----------------------------------------------------
-        # Görsel varsa
-        # ----------------------------------------------------
+        try:
 
-        if image_id:
+            await query.message.reply_photo(
+                photo=image_id,
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
 
-            try:
+            return
 
-                await query.message.reply_photo(
-                    photo=image_id,
-                    caption=text,
-                    parse_mode="HTML",
-                    reply_markup=keyboard
-                )
+        except Exception:
 
-                return
+            pass
 
-            except Exception:
-
-                pass
-
-        # ----------------------------------------------------
-        # Görsel yoksa
-        # ----------------------------------------------------
-
-        await query.message.reply_text(
-            text,
-            parse_mode="HTML",
-            reply_markup=keyboard
-        )
+    await query.message.reply_text(
+        text,
+        parse_mode="HTML",
+        reply_markup=keyboard
+    )
 
 
 # ============================================================
-# BOTU BAŞLAT
+# BOT
 # ============================================================
 
 def main():
@@ -442,17 +560,7 @@ def main():
         .build()
     )
 
-    # --------------------------------------------------------
-    # KOMUTLAR
-    # --------------------------------------------------------
-
-    application.add_handler(
-        CommandHandler(
-            "start",
-            start_command
-        )
-    )
-
+    # /site
     application.add_handler(
         CommandHandler(
             "site",
@@ -460,6 +568,7 @@ def main():
         )
     )
 
+    # /setimage
     application.add_handler(
         CommandHandler(
             "setimage",
@@ -467,6 +576,7 @@ def main():
         )
     )
 
+    # /siteimage
     application.add_handler(
         CommandHandler(
             "siteimage",
@@ -474,20 +584,14 @@ def main():
         )
     )
 
-    # --------------------------------------------------------
-    # INLINE BUTONLAR
-    # --------------------------------------------------------
-
+    # Inline butonlar
     application.add_handler(
         CallbackQueryHandler(
             button_callback
         )
     )
 
-    # --------------------------------------------------------
-    # FOTOĞRAF
-    # --------------------------------------------------------
-
+    # Fotoğraf
     application.add_handler(
         MessageHandler(
             filters.PHOTO,
@@ -495,10 +599,7 @@ def main():
         )
     )
 
-    # --------------------------------------------------------
     # .site / !site
-    # --------------------------------------------------------
-
     application.add_handler(
         MessageHandler(
             filters.TEXT & ~filters.COMMAND,
@@ -506,17 +607,24 @@ def main():
         )
     )
 
-    print("🤖 HEROPRIME bot çalışıyor...")
+    # Moderasyon
+    application.add_handler(
+        MessageHandler(
+            filters.TEXT | filters.Caption(),
+            moderation_handler
+        ),
+        group=1
+    )
 
-    # --------------------------------------------------------
-    # BOTU ÇALIŞTIR
-    # --------------------------------------------------------
+    print(
+        "🤖 HEROPRIME moderasyon botu çalışıyor..."
+    )
 
     application.run_polling()
 
 
 # ============================================================
-# PROGRAM BAŞLANGICI
+# BAŞLANGIÇ
 # ============================================================
 
 if __name__ == "__main__":
