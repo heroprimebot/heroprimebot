@@ -22,7 +22,7 @@ from telegram.ext import (
 # AYARLAR
 # ============================================================
 
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+BOT_TOKEN = '8862557397:AAE7SvuqE5ST4RiIcQz9g5G66o8uNzBV9Uw'
 
 IMAGE_FILE = "site_image.json"
 
