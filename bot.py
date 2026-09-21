@@ -35,19 +35,29 @@ IMAGE_FILE = "site_image.json"
 # Buraya kullanacağın güvenli/genel bağlantıları ekleyebilirsin.
 SITES = [
     (
-        "🎰 JASİNO",
+        "💎 JASİNO 2.000 TL 💎",
         "https://jasino.to/4ZD8"
     ),
+    
     (
-        "🎰 BETWINNER",
+        "💎 GALYABET 2.000 TL 💎",
+        "https://t.ly/4HEqX"
+    ),
+    
+    (
+        "💎 MİLANBAHİS 500 TL 💎",
+        "https://kisal.site/heroprime"
+    ),
+    (
+        "💎 BETWINNER 💎",
         "https://bwref-l4ftkntp.com/1Px4?p=%2Fregistration%2F"
     ),
     (
-        "💎 BİZBET",
+        "💎 BİZBET 💎",
         "https://refpa-0768.com/L?tag=d_2106249m_62079c_&site=2106249&ad=62079&r=registration/"
     ),
     (
-        "🌐 HEROPRIME WEB",
+        "🌐 HEROPRIME WEB 🌐",
         "https://heroprime68.com/"
     ),
 ]
@@ -62,31 +72,44 @@ def site_keyboard():
     keyboard = [
         [
             InlineKeyboardButton(
-                "🎰 JASİNO",
+                SITES[0][0],
                 url=SITES[0][1]
             )
         ],
         [
             InlineKeyboardButton(
-                "🎰 BETWINNER",
+                SITES[1][0],
                 url=SITES[1][1]
             )
         ],
         [
             InlineKeyboardButton(
-                "💎 BİZBET",
+                SITES[2][0],
                 url=SITES[2][1]
             )
         ],
         [
             InlineKeyboardButton(
-                "🌐 HEROPRIME WEB",
+                SITES[3][0],
                 url=SITES[3][1]
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                SITES[4][0],
+                url=SITES[4][1]
+            )
+        ],
+        [
+            InlineKeyboardButton(
+                SITES[5][0],
+                url=SITES[5][1]
             )
         ],
     ]
 
     return InlineKeyboardMarkup(keyboard)
+
 
 
 # ============================================================
