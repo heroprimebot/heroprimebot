@@ -14,7 +14,7 @@ from telegram.ext import (
 # ============================================================
 # AYARLAR
 # ============================================================
-BOT_TOKEN = '8862557397:AAGlsz2UrF-1WXnMEmEI7KAVNJpdKTN2W1A'
+BOT_TOKEN = '8862557397:AAEUVFKfquhWiX6oCGJKXDZBZblZz5J6fVk'
 
 # Bu hesap yönetici olarak sabit kabul edilir:
 # @heroprimemarketing
@@ -772,7 +772,12 @@ def main():
     logger.info("Admin kullanıcı adları: %s", sorted(ADMIN_USERNAMES))
     logger.info("Admin ID'leri: %s", sorted(ADMIN_IDS))
 
-    app = Application.builder().token(BOT_TOKEN).build()
+    app = (
+        Application.builder()
+        .token(BOT_TOKEN)
+        .post_init(post_init)
+        .build()
+    )
 
     app.add_handler(CommandHandler("start", start_command))
     app.add_handler(CommandHandler("myid", myid_command))
@@ -817,7 +822,10 @@ def main():
     )
 
     logger.info("HEROPRIME bot çalışıyor. Admin: @heroprimemarketing")
-    app.run_polling()
+    app.run_polling(
+        drop_pending_updates=True,
+        close_loop=False,
+    )
 
 
 if __name__ == "__main__":
