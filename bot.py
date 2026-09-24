@@ -5,7 +5,7 @@ import html
 import logging
 from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, filters
@@ -187,7 +187,7 @@ async def start_command(update, context):
     await update.message.reply_text(
         "🎛️ <b>HEROPRIME YÖNETİM PANELİ</b>\n\n"
         "➕ Site Ekle ile tek akışta site adı → komut → görsel → metin → buton adı → buton URL'si ekleyebilirsin.\n\n"
-        "Örnek grup kullanımı: <code>!raconbet</code>",
+        "Grup kullanımı: <code>!raconbet</code> direkt Raconbet içeriğini açar.\n<code>!site</code> site butonlarını gösterir; butona basınca aynı mesaj seçilen siteye dönüşür.",
         parse_mode="HTML",
         reply_markup=admin_keyboard(),
     )
@@ -248,8 +248,13 @@ async def admin_callback(update, context):
             "admin:edit_image": "edit_image_select",
             "admin:edit_button": "edit_button_select",
         }[action]
+        prompts = {
+            "admin:edit_text": "📝 Metnini değiştirmek istediğin site adını gönder.",
+            "admin:edit_image": "🖼️ Görselini değiştirmek istediğin site adını gönder.",
+            "admin:edit_button": "🔘 Butonunu değiştirmek istediğin site adını gönder.",
+        }
         await q.edit_message_text(
-            "Site adını gönder.",
+            prompts[action],
             reply_markup=cancel_keyboard()
         )
         return
@@ -444,6 +449,23 @@ async def admin_private_text(update, context):
         return
 
     # --------------------------------------------------------
+    # GÖRSEL DÜZENLE
+    # --------------------------------------------------------
+    if action == "edit_image_select":
+        site = site_by_name(value)
+        if not site:
+            await update.message.reply_text("❌ Site bulunamadı.")
+            return
+        context.user_data["edit_site_command"] = site["command"]
+        context.user_data["admin_action"] = "edit_image_value"
+        await update.message.reply_text(
+            f"🖼️ <b>{html.escape(site['name'])}</b> için yeni görseli gönder.",
+            parse_mode="HTML",
+            reply_markup=cancel_keyboard()
+        )
+        return
+
+    # --------------------------------------------------------
     # METİN DÜZENLE
     # --------------------------------------------------------
     if action == "edit_text_select":
@@ -564,6 +586,25 @@ async def admin_receive_photo(update, context):
         return
 
     photo = update.message.photo[-1]
+
+    if context.user_data.get("admin_action") == "edit_image_value":
+        site = site_by_command(context.user_data.get("edit_site_command", ""))
+        if not site:
+            await update.message.reply_text("❌ Site bulunamadı.")
+            context.user_data.clear()
+            return
+
+        site["image_id"] = photo.file_id
+        save_data(DATA)
+        context.user_data.clear()
+
+        await update.message.reply_text(
+            f"✅ <b>{html.escape(site['name'])}</b> görseli güncellendi.",
+            parse_mode="HTML",
+            reply_markup=admin_keyboard()
+        )
+        return
+
     context.user_data["new_site_image"] = photo.file_id
     context.user_data["admin_action"] = "add_site_text"
 
@@ -624,17 +665,51 @@ async def send_site_menu(message):
         await message.reply_text("📭 Henüz site eklenmemiş.")
         return
     await message.reply_text(
-        "🌐 <b>HEROPRIME SİTELER</b>\n\nBir site seç:",
+        "🌐 <b>HEROPRIME SİTELER</b>\n\n"
+        "Aşağıdaki butonlardan istediğin siteyi seç:",
         parse_mode="HTML",
         reply_markup=all_sites_keyboard()
     )
 
 
+async def edit_site_menu_to_site(query, site):
+    """!site menüsündeki mevcut mesajı yeni mesaj göndermeden seçilen siteye çevirir."""
+    text = html.escape(site.get("text") or site.get("name", ""))
+    markup = site_markup(site)
+
+    try:
+        if site.get("image_id"):
+            await query.edit_message_media(
+                media=InputMediaPhoto(
+                    media=site["image_id"],
+                    caption=text,
+                    parse_mode="HTML",
+                ),
+                reply_markup=markup
+            )
+        else:
+            await query.edit_message_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=markup
+            )
+    except Exception:
+        logger.exception("Site menüsü güncellenemedi.")
+        try:
+            await query.edit_message_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=markup
+            )
+        except Exception:
+            logger.exception("Site menüsü metin olarak da güncellenemedi.")
+
+
 # ============================================================
 # PUBLIC KOMUTLAR
-# !raconbet -> sadece Raconbet
-# !site -> tüm sitelerin menüsü
-# !site Raconbet -> sadece Raconbet
+# !raconbet -> direkt Raconbet içeriği
+# !site -> sitelerin buton menüsü
+# !site Raconbet -> direkt Raconbet içeriği
 # ============================================================
 async def public_text_commands(update, context):
     if not update.message or not update.message.text:
@@ -695,7 +770,7 @@ async def public_callback(update, context):
         command = q.data.split(":", 1)[1]
         site = site_by_command(command)
         if site:
-            await send_single_site(q.message, site)
+            await edit_site_menu_to_site(q, site)
 
 
 # ============================================================
