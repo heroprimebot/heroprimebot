@@ -1,3 +1,4 @@
+```python
 import os
 import sqlite3
 import logging
@@ -21,16 +22,18 @@ from telegram.ext import (
 # AYARLAR
 # =========================================================
 
+# TOKEN'I KODUN İÇİNE YAZMA.
+# Railway -> Variables kısmından BOT_TOKEN olarak ekle.
 BOT_TOKEN = '8862557397:AAFy7B3L7wfdvaPMGAYdDCAcA-FBmwQVh1s'
 
 ADMIN_IDS_RAW = os.getenv(
     "ADMIN_IDS",
-    "8845737995"
+    "8845737995",
 ).strip()
 
 DB_FILE = os.getenv(
     "DB_FILE",
-    "sites.db"
+    "sites.db",
 ).strip() or "sites.db"
 
 ALLOWED_CHAT_USERNAMES = {
@@ -105,7 +108,7 @@ def get_chat_username(chat) -> str:
         getattr(
             chat,
             "username",
-            ""
+            "",
         ) or ""
     )
 
@@ -123,9 +126,7 @@ def is_allowed_chat(update: Update) -> bool:
     ):
         return False
 
-    username = get_chat_username(
-        chat
-    )
+    username = get_chat_username(chat)
 
     return username in {
         normalize_username(x)
@@ -232,7 +233,10 @@ def get_setting(key):
             (key,),
         ).fetchone()
 
-        return row["value"] if row else None
+        if row:
+            return row["value"]
+
+        return None
 
     finally:
         connection.close()
@@ -329,19 +333,17 @@ async def setimage_photo(
         or not user
         or not is_admin(user.id)
     ):
-        return
+        return False
 
     if not context.user_data.get(
         "site_image_flow"
     ):
-        return
+        return False
 
     if not message.photo:
-        return
+        return False
 
-    file_id = (
-        message.photo[-1].file_id
-    )
+    file_id = message.photo[-1].file_id
 
     set_setting(
         "site_image_file_id",
@@ -361,6 +363,8 @@ async def setimage_photo(
         "bu görsel gösterilecek.",
         parse_mode="HTML",
     )
+
+    return True
 
 
 async def removeimage_command(
@@ -395,6 +399,31 @@ async def removeimage_command(
 
 
 # =========================================================
+# İPTAL
+# =========================================================
+
+async def cancel_command(
+    update,
+    context,
+):
+    message = update.effective_message
+    user = update.effective_user
+
+    if (
+        not message
+        or not user
+        or not is_admin(user.id)
+    ):
+        return
+
+    context.user_data.clear()
+
+    await message.reply_text(
+        "❌ Aktif işlem iptal edildi."
+    )
+
+
+# =========================================================
 # SITE FONKSİYONLARI
 # =========================================================
 
@@ -423,8 +452,10 @@ def valid_http_url(value: str) -> bool:
         )
 
         return (
-            parsed.scheme
-            in ("http", "https")
+            parsed.scheme in (
+                "http",
+                "https",
+            )
             and bool(parsed.netloc)
         )
 
@@ -545,9 +576,7 @@ def update_site(
         fields.append(
             "visible = ?"
         )
-        values.append(
-            int(visible)
-        )
+        values.append(int(visible))
 
     if not fields:
         return
@@ -620,9 +649,7 @@ def reorder_sites(site_ids):
 # TANITIM FONKSİYONLARI
 # =========================================================
 
-def get_promotion_by_command(
-    command
-):
+def get_promotion_by_command(command):
     command = normalize_site_command(
         command
     )
@@ -770,9 +797,7 @@ def delete_promotion(promo_id):
 # BUTONLAR
 # =========================================================
 
-def promotion_buttons_markup(
-    buttons
-):
+def promotion_buttons_markup(buttons):
     rows = []
 
     for button in buttons:
@@ -906,7 +931,7 @@ def site_admin_keyboard():
                         SITE_ADMIN_PREFIX
                         + "promo_delete"
                     ),
-                ],
+                )
             ],
             [
                 InlineKeyboardButton(
@@ -915,7 +940,7 @@ def site_admin_keyboard():
                         SITE_ADMIN_PREFIX
                         + "promo_list"
                     ),
-                ],
+                )
             ],
         ]
     )
@@ -977,6 +1002,10 @@ async def site_command(
         sites
     )
 
+    # -----------------------------------------------------
+    # KAYITLI SİTE GÖRSELİ
+    # -----------------------------------------------------
+
     if image_file_id:
         try:
             await message.reply_photo(
@@ -985,6 +1014,7 @@ async def site_command(
                 parse_mode="HTML",
                 reply_markup=markup,
             )
+
             return
 
         except Exception as error:
@@ -993,8 +1023,9 @@ async def site_command(
                 error,
             )
 
-            # Bozuk/eski file_id varsa
-            # metin olarak devam eder.
+    # -----------------------------------------------------
+    # GÖRSEL YOKSA NORMAL MESAJ
+    # -----------------------------------------------------
 
     await message.reply_text(
         caption,
@@ -1073,6 +1104,10 @@ async def site_admin_callback(
 
     await query.answer()
 
+    # -----------------------------------------------------
+    # PANEL
+    # -----------------------------------------------------
+
     if action == "panel":
         await query.message.reply_text(
             site_admin_text(),
@@ -1080,6 +1115,10 @@ async def site_admin_callback(
             reply_markup=site_admin_keyboard(),
         )
         return
+
+    # -----------------------------------------------------
+    # SITE EKLE
+    # -----------------------------------------------------
 
     if action == "add":
         context.user_data.clear()
@@ -1099,6 +1138,10 @@ async def site_admin_callback(
             parse_mode="HTML",
         )
         return
+
+    # -----------------------------------------------------
+    # SITE LİSTELE
+    # -----------------------------------------------------
 
     if action == "list":
         sites = get_sites(False)
@@ -1134,6 +1177,10 @@ async def site_admin_callback(
             parse_mode="HTML",
         )
         return
+
+    # -----------------------------------------------------
+    # SITE DÜZENLE / SİL
+    # -----------------------------------------------------
 
     if action in (
         "edit",
@@ -1183,6 +1230,10 @@ async def site_admin_callback(
         )
         return
 
+    # -----------------------------------------------------
+    # SITE SİL
+    # -----------------------------------------------------
+
     if action.startswith(
         "delete_id:"
     ):
@@ -1193,6 +1244,7 @@ async def site_admin_callback(
                     1,
                 )[1]
             )
+
         except ValueError:
             await query.message.reply_text(
                 "❌ Geçersiz site."
@@ -1206,6 +1258,10 @@ async def site_admin_callback(
         )
         return
 
+    # -----------------------------------------------------
+    # SITE DÜZENLE
+    # -----------------------------------------------------
+
     if action.startswith(
         "edit_id:"
     ):
@@ -1216,6 +1272,7 @@ async def site_admin_callback(
                     1,
                 )[1]
             )
+
         except ValueError:
             await query.message.reply_text(
                 "❌ Geçersiz site."
@@ -1247,6 +1304,10 @@ async def site_admin_callback(
             parse_mode="HTML",
         )
         return
+
+    # -----------------------------------------------------
+    # SITE SIRASI
+    # -----------------------------------------------------
 
     if action == "order":
         sites = get_sites(False)
@@ -1281,6 +1342,10 @@ async def site_admin_callback(
         )
         return
 
+    # -----------------------------------------------------
+    # TANITIM EKLE
+    # -----------------------------------------------------
+
     if action == "promo_add":
         context.user_data.clear()
 
@@ -1300,6 +1365,10 @@ async def site_admin_callback(
             parse_mode="HTML",
         )
         return
+
+    # -----------------------------------------------------
+    # TANITIM DÜZENLE / SİL
+    # -----------------------------------------------------
 
     if action in (
         "promo_edit",
@@ -1338,6 +1407,10 @@ async def site_admin_callback(
         )
         return
 
+    # -----------------------------------------------------
+    # TANITIM SİL
+    # -----------------------------------------------------
+
     if action.startswith(
         "promo_delete_id:"
     ):
@@ -1348,6 +1421,7 @@ async def site_admin_callback(
                     1,
                 )[1]
             )
+
         except ValueError:
             await query.message.reply_text(
                 "❌ Geçersiz tanıtım."
@@ -1363,6 +1437,10 @@ async def site_admin_callback(
         )
         return
 
+    # -----------------------------------------------------
+    # TANITIM DÜZENLE
+    # -----------------------------------------------------
+
     if action.startswith(
         "promo_edit_id:"
     ):
@@ -1373,6 +1451,7 @@ async def site_admin_callback(
                     1,
                 )[1]
             )
+
         except ValueError:
             await query.message.reply_text(
                 "❌ Geçersiz tanıtım."
@@ -1389,6 +1468,14 @@ async def site_admin_callback(
             )
             return
 
+        try:
+            buttons = json.loads(
+                promo["buttons_json"]
+                or "[]"
+            )
+        except Exception:
+            buttons = []
+
         context.user_data.clear()
 
         context.user_data[
@@ -1397,10 +1484,7 @@ async def site_admin_callback(
             "step": "edit_text",
             "id": promo["id"],
             "command": promo["command"],
-            "buttons": json.loads(
-                promo["buttons_json"]
-                or "[]"
-            ),
+            "buttons": buttons,
             "image": promo["image_file_id"],
         }
 
@@ -1413,6 +1497,10 @@ async def site_admin_callback(
             parse_mode="HTML",
         )
         return
+
+    # -----------------------------------------------------
+    # TANITIM LİSTELE
+    # -----------------------------------------------------
 
     if action == "promo_list":
         promos = get_promotions()
@@ -1472,6 +1560,10 @@ async def site_admin_callback_extended(
 
     data = query.data or ""
 
+    # -----------------------------------------------------
+    # SITE EKLE - GÖRÜNÜRLÜK
+    # -----------------------------------------------------
+
     if data.startswith(
         SITE_ADMIN_PREFIX + "vis:"
     ):
@@ -1508,6 +1600,10 @@ async def site_admin_callback_extended(
         )
 
         return
+
+    # -----------------------------------------------------
+    # SITE DÜZENLE - GÖRÜNÜRLÜK
+    # -----------------------------------------------------
 
     if data.startswith(
         SITE_ADMIN_PREFIX + "editvis:"
@@ -1547,6 +1643,10 @@ async def site_admin_callback_extended(
 
         return
 
+    # -----------------------------------------------------
+    # TANITIM - GÖRSEL EKLE
+    # -----------------------------------------------------
+
     if data == (
         SITE_ADMIN_PREFIX
         + "p_skip:0"
@@ -1571,6 +1671,10 @@ async def site_admin_callback_extended(
         )
 
         return
+
+    # -----------------------------------------------------
+    # TANITIM - GÖRSELİ GEÇ
+    # -----------------------------------------------------
 
     if data == (
         SITE_ADMIN_PREFIX
@@ -1597,6 +1701,10 @@ async def site_admin_callback_extended(
 
         return
 
+    # -----------------------------------------------------
+    # TANITIM - BUTON EKLE
+    # -----------------------------------------------------
+
     if data == (
         SITE_ADMIN_PREFIX
         + "btn_add"
@@ -1621,6 +1729,10 @@ async def site_admin_callback_extended(
         )
 
         return
+
+    # -----------------------------------------------------
+    # TANITIM - KAYDET
+    # -----------------------------------------------------
 
     if data == (
         SITE_ADMIN_PREFIX
@@ -1702,7 +1814,8 @@ async def site_admin_flow_message(
         message.text or ""
     ).strip()
 
-    if text == "/iptal":
+    # /iptal
+    if text.lower() == "/iptal":
         context.user_data.clear()
 
         await message.reply_text(
@@ -1712,6 +1825,10 @@ async def site_admin_flow_message(
         return True
 
     step = flow.get("step")
+
+    # -----------------------------------------------------
+    # SITE ADI
+    # -----------------------------------------------------
 
     if step == "name":
         if (
@@ -1734,6 +1851,10 @@ async def site_admin_flow_message(
         )
 
         return True
+
+    # -----------------------------------------------------
+    # SITE URL
+    # -----------------------------------------------------
 
     if step == "url":
         if not valid_http_url(text):
@@ -1771,6 +1892,10 @@ async def site_admin_flow_message(
 
         return True
 
+    # -----------------------------------------------------
+    # SITE DÜZENLE - AD
+    # -----------------------------------------------------
+
     if step == "edit_name":
         if (
             not text
@@ -1789,6 +1914,10 @@ async def site_admin_flow_message(
         )
 
         return True
+
+    # -----------------------------------------------------
+    # SITE DÜZENLE - URL
+    # -----------------------------------------------------
 
     if step == "edit_url":
         if not valid_http_url(text):
@@ -1825,6 +1954,10 @@ async def site_admin_flow_message(
         )
 
         return True
+
+    # -----------------------------------------------------
+    # SITE SIRASI
+    # -----------------------------------------------------
 
     if step == "order":
         try:
@@ -1946,7 +2079,8 @@ async def site_admin_promo_flow(
         message.text or ""
     ).strip()
 
-    if text == "/iptal":
+    # /iptal
+    if text.lower() == "/iptal":
         context.user_data.clear()
 
         await message.reply_text(
@@ -1956,6 +2090,10 @@ async def site_admin_promo_flow(
         return True
 
     step = flow.get("step")
+
+    # -----------------------------------------------------
+    # TANITIM KOMUTU
+    # -----------------------------------------------------
 
     if step == "command":
         command = normalize_site_command(
@@ -2012,6 +2150,10 @@ async def site_admin_promo_flow(
 
         return True
 
+    # -----------------------------------------------------
+    # TANITIM METNİ
+    # -----------------------------------------------------
+
     if step in (
         "text",
         "edit_text",
@@ -2055,6 +2197,10 @@ async def site_admin_promo_flow(
 
         return True
 
+    # -----------------------------------------------------
+    # BUTON YAZISI
+    # -----------------------------------------------------
+
     if step == "button_text":
         if (
             not text
@@ -2074,6 +2220,10 @@ async def site_admin_promo_flow(
         )
 
         return True
+
+    # -----------------------------------------------------
+    # BUTON URL
+    # -----------------------------------------------------
 
     if step == "button_url":
         if not valid_http_url(text):
@@ -2176,10 +2326,13 @@ async def run_promotion_command(
     if not promo:
         return
 
-    buttons = json.loads(
-        promo["buttons_json"]
-        or "[]"
-    )
+    try:
+        buttons = json.loads(
+            promo["buttons_json"]
+            or "[]"
+        )
+    except Exception:
+        buttons = []
 
     markup = promotion_buttons_markup(
         buttons
@@ -2188,12 +2341,24 @@ async def run_promotion_command(
     text = promo["text"]
 
     if promo["image_file_id"]:
-        await message.reply_photo(
-            photo=promo["image_file_id"],
-            caption=text,
-            parse_mode="HTML",
-            reply_markup=markup,
-        )
+        try:
+            await message.reply_photo(
+                photo=promo["image_file_id"],
+                caption=text,
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
+        except Exception as error:
+            logger.warning(
+                "Tanıtım görseli gönderilemedi: %s",
+                error,
+            )
+
+            await message.reply_text(
+                text,
+                parse_mode="HTML",
+                reply_markup=markup,
+            )
 
     else:
         await message.reply_text(
@@ -2239,7 +2404,8 @@ async def start_command(
         "/site\n"
         "/siteyonetim\n"
         "/setimage\n"
-        "/removeimage\n\n"
+        "/removeimage\n"
+        "/iptal\n\n"
         "📢 <b>Tanıtım sistemi</b>\n"
         "Özel tanıtım komutlarını "
         "site yönetiminden oluşturabilirsin.",
@@ -2352,9 +2518,9 @@ def main():
         .build()
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # TEMEL KOMUTLAR
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         CommandHandler(
@@ -2370,9 +2536,16 @@ def main():
         )
     )
 
-    # -----------------------------------------------------
+    application.add_handler(
+        CommandHandler(
+            "iptal",
+            cancel_command,
+        )
+    )
+
+    # =====================================================
     # SITE KOMUTLARI
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         CommandHandler(
@@ -2388,9 +2561,9 @@ def main():
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # SITE GÖRSEL KOMUTLARI
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         CommandHandler(
@@ -2406,7 +2579,10 @@ def main():
         )
     )
 
+    # =====================================================
     # !site / .site
+    # =====================================================
+
     application.add_handler(
         MessageHandler(
             filters.Regex(
@@ -2416,12 +2592,12 @@ def main():
         )
     )
 
-    # -----------------------------------------------------
-    # SITE GÖRSELİ PHOTO
+    # =====================================================
+    # SITE GÖRSELİ
     #
-    # group=1 olduğu için normal site/promo
-    # fotoğraf akışlarından önce yakalanır.
-    # -----------------------------------------------------
+    # Admin /setimage dedikten sonra gönderilen fotoğrafı
+    # kaydeder.
+    # =====================================================
 
     application.add_handler(
         MessageHandler(
@@ -2431,9 +2607,9 @@ def main():
         group=1,
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # SITE ADMIN CALLBACK
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         CallbackQueryHandler(
@@ -2453,9 +2629,9 @@ def main():
         )
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # SITE ADMIN GÖRSEL
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         MessageHandler(
@@ -2466,9 +2642,9 @@ def main():
         group=2,
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # SITE ADMIN METİN
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         MessageHandler(
@@ -2480,9 +2656,9 @@ def main():
         group=2,
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # TANITIM ADMIN METİN AKIŞI
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         MessageHandler(
@@ -2494,12 +2670,13 @@ def main():
         group=3,
     )
 
-    # -----------------------------------------------------
+    # =====================================================
     # TANITIM KOMUTLARI
+    #
     # !raconbet
     # .raconbet
     # /raconbet
-    # -----------------------------------------------------
+    # =====================================================
 
     application.add_handler(
         MessageHandler(
@@ -2510,6 +2687,10 @@ def main():
         group=4,
     )
 
+    # =====================================================
+    # HATA YAKALAMA
+    # =====================================================
+
     application.add_error_handler(
         error_handler
     )
@@ -2517,6 +2698,10 @@ def main():
     logger.info(
         "HEROPRIME Site Botu başlatılıyor..."
     )
+
+    # =====================================================
+    # POLLING
+    # =====================================================
 
     application.run_polling(
         allowed_updates=Update.ALL_TYPES,
@@ -2531,3 +2716,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
