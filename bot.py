@@ -35,11 +35,18 @@ ADMIN_IDS = {
 
 # İstersen tek bir yönetici kullanıcı adı da ekleyebilirsin.
 # Örn: ADMIN_USERNAMES=HeroPrimeMarketing
-ADMIN_USERNAMES = {
-    x.strip().lstrip("@").lower()
-    for x in os.getenv("ADMIN_USERNAMES", "").split(",")
-    if x.strip()
-}
+# ADMIN_USERNAMES boş bırakılırsa mevcut yönetici hesabı varsayılan olarak
+# @HeroPrimeMarketing kabul edilir. İstersen Railway Variables üzerinden
+# ADMIN_USERNAMES ile değiştirebilirsin.
+_admin_usernames_raw = os.getenv("ADMIN_USERNAMES", "").strip()
+if _admin_usernames_raw:
+    ADMIN_USERNAMES = {
+        x.strip().lstrip("@").lower()
+        for x in _admin_usernames_raw.split(",")
+        if x.strip()
+    }
+else:
+    ADMIN_USERNAMES = {"heroprimemarketing"}
 
 DATA_FILE = Path(os.getenv("DATA_FILE", "bot_data.json"))
 
@@ -952,6 +959,23 @@ async def public_text_commands(update, context):
 
 
 # ============================================================
+# /myid - TELEGRAM KULLANICI ID
+# ============================================================
+
+async def myid_command(update, context):
+    if not update.message or not update.effective_user:
+        return
+
+    user = update.effective_user
+    username = f"@{user.username}" if user.username else "(kullanıcı adı yok)"
+    await update.message.reply_text(
+        f"🆔 Telegram ID: <code>{user.id}</code>\\n"
+        f"👤 Kullanıcı adı: <code>{html.escape(username)}</code>",
+        parse_mode="HTML",
+    )
+
+
+# ============================================================
 # /site
 # ============================================================
 
@@ -1053,6 +1077,9 @@ def main():
             "BOT_TOKEN bulunamadı. Railway Variables içine BOT_TOKEN ekle."
         )
 
+    logger.info("Yönetici ID'leri: %s", sorted(ADMIN_IDS))
+    logger.info("Yönetici kullanıcı adları: %s", sorted(ADMIN_USERNAMES))
+
     if not ADMIN_IDS and not ADMIN_USERNAMES:
         logger.warning(
             "ADMIN_IDS / ADMIN_USERNAMES ayarlanmadı. "
@@ -1068,6 +1095,11 @@ def main():
     # Özelden /start -> yönetim paneli
     application.add_handler(
         CommandHandler("start", start_command)
+    )
+
+    # /myid
+    application.add_handler(
+        CommandHandler("myid", myid_command)
     )
 
     # /site
