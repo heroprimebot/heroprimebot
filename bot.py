@@ -763,6 +763,14 @@ async def moderation_handler(update, context):
 # ============================================================
 # MAIN
 # ============================================================
+async def post_init(application):
+    """Polling başlamadan önce varsa eski webhook'u temizler."""
+    try:
+        await application.bot.delete_webhook(drop_pending_updates=True)
+        logger.info("Webhook temizlendi; polling başlatılıyor.")
+    except Exception:
+        logger.exception("Webhook temizlenirken hata oluştu.")
+
 def main():
     if not BOT_TOKEN:
         raise RuntimeError(
