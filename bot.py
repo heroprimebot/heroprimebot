@@ -5,7 +5,7 @@ import html
 import logging
 from pathlib import Path
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputMediaPhoto
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application, CommandHandler, MessageHandler, CallbackQueryHandler,
     ContextTypes, filters
@@ -673,43 +673,49 @@ async def send_site_menu(message):
 
 
 async def edit_site_menu_to_site(query, site):
-    """!site menüsündeki mevcut mesajı yeni mesaj göndermeden seçilen siteye çevirir."""
-    text = html.escape(site.get("text") or site.get("name", ""))
-    markup = site_markup(site)
+    """
+    !site menüsünde bir siteye basıldığında SADECE bağlantı onayı gösterir.
+    Görsel/metin burada gösterilmez.
 
-    try:
-        if site.get("image_id"):
-            await query.edit_message_media(
-                media=InputMediaPhoto(
-                    media=site["image_id"],
-                    caption=text,
-                    parse_mode="HTML",
-                ),
-                reply_markup=markup
+    Örnek:
+      !site -> site butonları
+      Raconbet -> "Bu bağlantıyı açmak ister misin?" + Raconbet bağlantı butonu
+
+    Direkt !raconbet komutu ise public_text_commands() içinden
+    send_single_site() çağırdığı için görsel + metin + linki göstermeye devam eder.
+    """
+    button_text = site.get("button_text") or f"{site.get('name', 'Site')} bağlantısını aç"
+
+    markup = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton(
+                f"🔗 {button_text}",
+                url=site.get("url", "")
             )
-        else:
-            await query.edit_message_text(
-                text,
-                parse_mode="HTML",
-                reply_markup=markup
+        ],
+        [
+            InlineKeyboardButton(
+                "⬅️ Site Listesine Dön",
+                callback_data="site_menu:back"
             )
-    except Exception:
-        logger.exception("Site menüsü güncellenemedi.")
-        try:
-            await query.edit_message_text(
-                text,
-                parse_mode="HTML",
-                reply_markup=markup
-            )
-        except Exception:
-            logger.exception("Site menüsü metin olarak da güncellenemedi.")
+        ]
+    ])
+
+    site_name = html.escape(site.get("name", "Site"))
+
+    await query.edit_message_text(
+        f"🔗 <b>{site_name}</b>\n\n"
+        f"Bu bağlantıyı açmak ister misin?",
+        parse_mode="HTML",
+        reply_markup=markup
+    )
 
 
 # ============================================================
 # PUBLIC KOMUTLAR
 # !raconbet -> direkt Raconbet içeriği
-# !site -> sitelerin buton menüsü
-# !site Raconbet -> direkt Raconbet içeriği
+# !site -> sitelerin buton menüsü; tıklanınca sadece bağlantı onayı
+# !site Raconbet -> isimli kullanım desteklenir ve direkt Raconbet içeriği
 # ============================================================
 async def public_text_commands(update, context):
     if not update.message or not update.message.text:
@@ -765,6 +771,18 @@ async def public_text_commands(update, context):
 async def public_callback(update, context):
     q = update.callback_query
     await q.answer()
+
+    if q.data == "site_menu:back":
+        if DATA["sites"]:
+            await q.edit_message_text(
+                "🌐 <b>HEROPRIME SİTELER</b>\n\n"
+                "Aşağıdaki butonlardan istediğin siteyi seç:",
+                parse_mode="HTML",
+                reply_markup=all_sites_keyboard()
+            )
+        else:
+            await q.edit_message_text("📭 Henüz site eklenmemiş.")
+        return
 
     if q.data.startswith("site:"):
         command = q.data.split(":", 1)[1]
