@@ -907,6 +907,15 @@ def site_admin_keyboard():
             ],
             [
                 InlineKeyboardButton(
+                    "🛡️ /modekle",
+                    callback_data=(
+                        SITE_ADMIN_PREFIX
+                        + "modekle"
+                    ),
+                )
+            ],
+            [
+                InlineKeyboardButton(
                     "➕ Tanıtım Ekle",
                     callback_data=(
                         SITE_ADMIN_PREFIX
@@ -993,8 +1002,11 @@ async def site_command(
     )
 
     caption = (
-        "🌐 <b>HEROPRIME SİTELER</b>\n\n"
-        "Bir site seç:"
+        "📌 <b>Güvenilir Sponsor ve VIP Sitelerimize aşağıdaki butonlardan ulaşabilirsiniz.</b>\n\n"
+        "⚠️ <b>Dikkat!</b>\n\n"
+        "<b>Hiçbir yönetici sizden özel mesaj yoluyla para talep etmez veya hesabınıza giriş bilgisi istemez.</b>\n\n"
+        "🛡️ <b>Şüpheli durumlarda veya destek ihtiyacınızda:</b>\n\n"
+        "<b>!mod yazarak ekibimize ulaşabilirsiniz.</b>"
     )
 
     markup = site_menu_markup(
@@ -1493,6 +1505,36 @@ async def site_admin_callback(
         return
 
     # -----------------------------------------------------
+    # /MOD MESAJI AYARLA
+    # -----------------------------------------------------
+
+    if action == "modekle":
+        if not is_admin(query.from_user.id):
+            await query.message.reply_text("❌ Yetkin yok.")
+            return
+
+        context.user_data.clear()
+        context.user_data["mod_flow"] = True
+
+        current = get_setting("mod_text")
+
+        await query.message.reply_text(
+            "🛡️ <b>/modekle</b>\n\n"
+            "Şimdi <b>!mod</b> komutunun göndereceği mesajı gönder.\n\n"
+            + (
+                "Mevcut mesaj:\n"
+                + escape(current)
+                + "\n\n"
+                if current
+                else ""
+            )
+            + "HTML kullanabilirsin.\n"
+            + "/iptal ile iptal edebilirsin.",
+            parse_mode="HTML",
+        )
+        return
+
+    # -----------------------------------------------------
     # TANITIM EKLE
     # -----------------------------------------------------
 
@@ -1953,6 +1995,32 @@ async def site_admin_flow_message(
     ):
         return False
 
+    if context.user_data.get("mod_flow"):
+        if text.lower() == "/iptal":
+            context.user_data.clear()
+            await message.reply_text("❌ İşlem iptal edildi.")
+            return True
+
+        if not text:
+            await message.reply_text("❌ Mesaj boş olamaz.")
+            return True
+
+        if len(text) > SITE_MAX_TEXT:
+            await message.reply_text(
+                "❌ Mesaj 3500 karakteri geçemez."
+            )
+            return True
+
+        set_setting("mod_text", text)
+        context.user_data.clear()
+
+        await message.reply_text(
+            "✅ <b>!mod mesajı kaydedildi.</b>\n\n"
+            + escape(text),
+            parse_mode="HTML",
+        )
+        return True
+
     flow = context.user_data.get(
         "site_flow"
     )
@@ -2391,6 +2459,69 @@ async def site_admin_promo_flow(
 
 
 # =========================================================
+# !MOD / /MODEKLE
+# =========================================================
+
+DEFAULT_MOD_TEXT = (
+    "🛡️ <b>Destek</b>\n\n"
+    "Şüpheli durumlarda veya destek ihtiyacınızda "
+    "<b>!mod</b> yazarak ekibimize ulaşabilirsiniz."
+)
+
+
+async def modekle_command(
+    update,
+    context,
+):
+    message = update.effective_message
+    user = update.effective_user
+
+    if (
+        not message
+        or not user
+        or not is_admin(user.id)
+        or message.chat.type != "private"
+    ):
+        return
+
+    context.user_data["mod_flow"] = True
+
+    current = get_setting("mod_text")
+
+    await message.reply_text(
+        "🛡️ <b>/modekle</b>\n\n"
+        "Şimdi <b>!mod</b> komutunun göndereceği mesajı gönder.\n\n"
+        + (
+            "Mevcut mesaj:\n"
+            + escape(current)
+            + "\n\n"
+            if current
+            else ""
+        )
+        + "HTML kullanabilirsin.\n"
+        + "/iptal ile iptal edebilirsin.",
+        parse_mode="HTML",
+    )
+
+
+async def mod_command(
+    update,
+    context,
+):
+    message = update.effective_message
+
+    if not message:
+        return
+
+    text = get_setting("mod_text") or DEFAULT_MOD_TEXT
+
+    await message.reply_text(
+        text,
+        parse_mode="HTML",
+    )
+
+
+# =========================================================
 # TANITIM KOMUTLARI
 # =========================================================
 
@@ -2426,6 +2557,8 @@ async def run_promotion_command(
         "iptal",
         "setimage",
         "removeimage",
+        "mod",
+        "modekle",
     }
 
     if command in reserved_commands:
@@ -2691,6 +2824,20 @@ def main():
         )
     )
 
+    application.add_handler(
+        CommandHandler(
+            "modekle",
+            modekle_command,
+        )
+    )
+
+    application.add_handler(
+        CommandHandler(
+            "mod",
+            mod_command,
+        )
+    )
+
     # =====================================================
     # !site / .site
     # =====================================================
@@ -2701,6 +2848,15 @@ def main():
                 r"^\s*[!.]site\s*$"
             ),
             site_alias_command,
+        )
+    )
+
+    application.add_handler(
+        MessageHandler(
+            filters.Regex(
+                r"^\s*[!.]mod\s*$"
+            ),
+            mod_command,
         )
     )
 
