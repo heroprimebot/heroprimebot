@@ -1317,26 +1317,177 @@ async def site_admin_callback(
             )
             return
 
-        context.user_data.clear()
+        # Sıralama artık ID veya sayı yazılarak yapılmıyor.
+        # Önce sırası değiştirilecek site buton olarak seçiliyor.
+        rows = []
 
-        context.user_data[
-            "site_flow"
-        ] = {
-            "step": "order"
-        }
+        for i, site in enumerate(sites, 1):
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        f"{i}. {site['name']}",
+                        callback_data=(
+                            f"{SITE_ADMIN_PREFIX}"
+                            f"order_site:{site['id']}"
+                        ),
+                    )
+                ]
+            )
 
-        ids = ", ".join(
-            str(site["id"])
-            for site in sites
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    "⬅️ Geri",
+                    callback_data=(
+                        SITE_ADMIN_PREFIX + "panel"
+                    ),
+                )
+            ]
         )
 
         await query.message.reply_text(
             "↕️ <b>SİTE SIRASI</b>\n\n"
-            f"Mevcut ID sırası:\n"
-            f"<code>{ids}</code>\n\n"
-            "Yeni sırayı virgülle gönder.\n\n"
-            "Örnek:\n"
-            "<code>3,1,2</code>",
+            "Sırasını değiştirmek istediğin siteyi seç:",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(rows),
+        )
+        return
+
+    # -----------------------------------------------------
+    # SIRALAMA - SİTE SEÇ
+    # -----------------------------------------------------
+
+    if action.startswith("order_site:"):
+        try:
+            site_id = int(
+                action.split(":", 1)[1]
+            )
+        except ValueError:
+            await query.message.reply_text(
+                "❌ Geçersiz site."
+            )
+            return
+
+        sites = get_sites(False)
+        site = get_site(site_id)
+
+        if not site or not any(
+            int(x["id"]) == site_id for x in sites
+        ):
+            await query.message.reply_text(
+                "❌ Site bulunamadı."
+            )
+            return
+
+        current_position = next(
+            (
+                i
+                for i, x in enumerate(sites, 1)
+                if int(x["id"]) == site_id
+            ),
+            None,
+        )
+
+        rows = []
+
+        for position in range(1, len(sites) + 1):
+            label = f"{position}. sıra"
+
+            if position == current_position:
+                label += " ✅"
+
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        label,
+                        callback_data=(
+                            f"{SITE_ADMIN_PREFIX}"
+                            f"order_pos:{site_id}:{position}"
+                        ),
+                    )
+                ]
+            )
+
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    "⬅️ Siteler",
+                    callback_data=(
+                        SITE_ADMIN_PREFIX + "order"
+                    ),
+                )
+            ]
+        )
+
+        await query.message.reply_text(
+            "↕️ <b>SİTE SIRASI</b>\n\n"
+            f"<b>{escape(site['name'])}</b> seçildi.\n"
+            f"Mevcut sıra: <b>{current_position}</b>\n\n"
+            "Bu siteyi hangi sıraya almak istiyorsun?",
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup(rows),
+        )
+        return
+
+    # -----------------------------------------------------
+    # SIRALAMA - YENİ POZİSYON
+    # -----------------------------------------------------
+
+    if action.startswith("order_pos:"):
+        try:
+            parts = action.split(":")
+            site_id = int(parts[1])
+            new_position = int(parts[2])
+        except (ValueError, IndexError):
+            await query.message.reply_text(
+                "❌ Geçersiz sıralama."
+            )
+            return
+
+        sites = get_sites(False)
+        site = get_site(site_id)
+
+        if not site or not any(
+            int(x["id"]) == site_id for x in sites
+        ):
+            await query.message.reply_text(
+                "❌ Site bulunamadı."
+            )
+            return
+
+        if not 1 <= new_position <= len(sites):
+            await query.message.reply_text(
+                "❌ Geçersiz sıra numarası."
+            )
+            return
+
+        # Seçilen siteyi bulunduğu yerden çıkarıp
+        # seçilen yeni pozisyona yerleştiriyoruz.
+        site_ids = [
+            int(x["id"])
+            for x in sites
+            if int(x["id"]) != site_id
+        ]
+
+        site_ids.insert(
+            new_position - 1,
+            site_id
+        )
+
+        reorder_sites(site_ids)
+
+        updated_sites = get_sites(False)
+
+        lines = []
+
+        for i, item in enumerate(updated_sites, 1):
+            lines.append(
+                f"{i}. <b>{escape(item['name'])}</b>"
+            )
+
+        await query.message.reply_text(
+            "✅ <b>Site sırası güncellendi.</b>\n\n"
+            + "\n".join(lines),
             parse_mode="HTML",
         )
         return
@@ -1958,46 +2109,8 @@ async def site_admin_flow_message(
     # SITE SIRASI
     # -----------------------------------------------------
 
-    if step == "order":
-        try:
-            ids = [
-                int(x.strip())
-                for x in text.split(",")
-                if x.strip()
-            ]
-
-        except ValueError:
-            await message.reply_text(
-                "❌ ID formatı hatalı."
-            )
-            return True
-
-        sites = get_sites(False)
-
-        valid = {
-            site["id"]
-            for site in sites
-        }
-
-        if (
-            set(ids) != valid
-            or len(ids) != len(valid)
-        ):
-            await message.reply_text(
-                "❌ Tüm site ID'lerini "
-                "birer kez sıralamalısın."
-            )
-            return True
-
-        reorder_sites(ids)
-
-        context.user_data.clear()
-
-        await message.reply_text(
-            "✅ Site sırası güncellendi."
-        )
-
-        return True
+    # Site sıralaması artık tamamen inline butonlarla yapılır.
+    # Bu nedenle burada ID veya sayı girişi kabul edilmiyor.
 
     return False
 
